@@ -1,0 +1,6 @@
+@Sidecard_HostAddress = http://localhost:5098
+
+GET {{Sidecard_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
