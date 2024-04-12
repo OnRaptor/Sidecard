@@ -25,6 +25,7 @@ services:
     environment:
       - SIDECAR_ADDRESS=http://sidecar:5103
     depends_on:
+      - sidecar
     networks:
       - internal
     restart: always
