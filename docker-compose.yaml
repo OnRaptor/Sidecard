@@ -1,6 +1,21 @@
 version: "3.9"
 
 services:
+  sidecar:
+    image: sidecar-demo-main
+    build:
+      context: ./
+      dockerfile: Dockerfile-alpine
+    environment:
+      SIDECAR_PORT: 5103
+      TRANSPORTER: nats://nats:4222
+    depends_on:
+      - nats
+    networks:
+      - internal
+      - external
+    restart: always
+    
   aspnetcore-service:
     build:
       context: .
@@ -8,20 +23,19 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - SIDECAR_ADDRESS=http://localhost:8080/
+      - SIDECAR_ADDRESS=http://sidecar:5103
     depends_on:
-      - nats
     networks:
       - internal
-      - external
     restart: always
 
   nats:
     image: nats:latest
     ports:
       - "4222:4222"
-    environment:
-      - NATS_JETSTREAM=true
+    networks:
+      - external
+    restart: always
 
 networks:
   internal: {}
