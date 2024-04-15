@@ -28,33 +28,39 @@ app.Lifetime.ApplicationStarted.Register(async () =>
 {
     var sp = builder.Services.BuildServiceProvider();
     var logger = sp.GetService<ILogger<Program>>();    
-    try
+    
+    var molecularService = sp.GetService<MolecularService>();
+    bool isRegistered = false;
+    for(var i = 0; i < 5; i++)
     {
-        var molecularService = sp.GetService<MolecularService>();
-        for(var i = 0; i < 5; i++)
+        try
         {
             logger.LogInformation($"Trying to register the sidecar scheme, {i+1} try");
             if (await molecularService.RegisterService())
             {
                 logger.LogInformation("Successfully registered the sidecar scheme");
-                break;
+                isRegistered = true;
             }
-
-            await Task.Delay(2000);
-        };
-        
-        logger.LogInformation("Retrieving available services");
-        var r = await molecularService.GetRegisteredServices();
-        if (r != null)
-            logger.LogInformation("Result:" + r);
-        else
-            logger.LogInformation("Unable to retrieve available services");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError("Failed to register the sidecar scheme, next try in 2 secs...");
+        }
+        await Task.Delay(2000);
     }
-    catch (Exception ex)
+    if (!isRegistered)
     {
-        logger.LogError(ex, "Failed to register the sidecar scheme, leaving...");
+        logger.LogError("Failed to register the sidecar scheme, leaving...");
         Environment.Exit(1);
+        return;
     }
+    logger.LogInformation("Retrieving available services");
+    var r = await molecularService.GetRegisteredServices();
+    if (r != null)
+        logger.LogInformation("Result:" + r);
+    else
+        logger.LogInformation("Unable to retrieve available services");
+    
 });
 app.UseHttpsRedirection();
 
