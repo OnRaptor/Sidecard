@@ -1,10 +1,20 @@
+using Sidecard.Services;
+using Refit;
+
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddNewtonsoftJson();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddLogging();
 
+var sp = builder.Services.BuildServiceProvider();
+var address = sp.GetService<IConfiguration>().GetValue<string>("SIDECAR_ADDRESS");
+builder.Services
+    .AddRefitClient<MolecularNetService>()
+    .ConfigureHttpClient(c => c.BaseAddress = new Uri(address));
+
+builder.Services.AddScoped<MolecularService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -18,32 +28,32 @@ app.Lifetime.ApplicationStarted.Register(async () =>
 {
     var sp = builder.Services.BuildServiceProvider();
     var logger = sp.GetService<ILogger<Program>>();    
-    logger.LogInformation("Trying to register the sidecar scheme");
     try
     {
-        var client = new HttpClient();
-        var address = sp.GetService<IConfiguration>().GetValue<string>("SIDECAR_ADDRESS");
-        client.BaseAddress = new Uri(address);
-
-        var result = client.PostAsJsonAsync("/v1/registry/services",
-            new
+        var molecularService = sp.GetService<MolecularService>();
+        for(var i = 0; i < 5; i++)
+        {
+            logger.LogInformation($"Trying to register the sidecar scheme, {i+1} try");
+            if (await molecularService.RegisterService())
             {
-                name = "c#-demo",
-                settings = new
-                {
-                    baseUrl = "http://localhost:5098"
-                },
-                actions = new
-                {
-                    hello = "/actions/hello",
-                }
-            });
+                logger.LogInformation("Successfully registered the sidecar scheme");
+                break;
+            }
 
-        logger.LogInformation("Register response:\n" + await result.Result.Content.ReadAsStringAsync());
+            await Task.Delay(2000);
+        };
+        
+        logger.LogInformation("Retrieving available services");
+        var r = await molecularService.GetRegisteredServices();
+        if (r != null)
+            logger.LogInformation("Result:" + r);
+        else
+            logger.LogInformation("Unable to retrieve available services");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Failed to register the sidecar scheme");
+        logger.LogError(ex, "Failed to register the sidecar scheme, leaving...");
+        Environment.Exit(1);
     }
 });
 app.UseHttpsRedirection();
